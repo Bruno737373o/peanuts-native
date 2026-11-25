@@ -71,14 +71,17 @@ jobs:
           package	2.0.2
           EOF
 
-      - name: Executar dm/gfx/tools/shader_split.py
+      - name: Inspecionar perfil existente e rodar shader_split.py
+        env:
+          DM_GAME: "01009FB016286000"
         run: |
-          echo "=== Ajuda do shader_split.py ==="
+          echo "=== Conteúdo atual de dm/games/01009FB016286000/ ==="
+          ls -la dm/games/01009FB016286000/
+          cat dm/games/01009FB016286000/game.tsv || true
+
+          echo "=== Ajuda do shader_split.py com DM_GAME configurado ==="
           python3 dm/gfx/tools/shader_split.py --help || true
-          
-          echo "=== Ajuda do dmsh_facts.py e pso_offline.py ==="
           python3 dm/gfx/tools/dmsh_facts.py --help || true
-          python3 dm/gfx/tools/pso_offline.py --help || true
 
       - name: Verificar arquivos TSV gerados
         run: |
