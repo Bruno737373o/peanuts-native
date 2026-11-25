@@ -1,5 +1,42 @@
-title	01009FB016286000
-name	Sonic Origins
-build	2.0.2	main=F57DB1FA410FD9DD
-package	2.0.2
+# Sonic Origins / Sonic Origins Plus (Retro Engine RSDKv5U + Hedgehog Engine UI on NVN).
+# Base Title ID 01009FB016286000; Plus content is unlocked via DLC AOCs and v2.0.0+ title updates.
+# Shaders are compiled NVN binaries embedded in main and packaged inside the RomFS archives (Data.rsdk / UI bundles).
 
+# ---- Identity ----
+title_id	01009FB016286000
+program_id	01009FB016286000
+
+# ---- App ----
+name	Sonic Origins
+ipa	SonicOrigins.ipa
+app_category	public.app-category.action-games
+pad_layout	full
+
+# ---- Versions ----
+# Substitua os hashes de subsdk0 e sdk pelos Build IDs completos (32 chars hex) extraídos do seu exefs.zip
+build	v0	1.0.0	main=
+build	v131072	1.1.0	main=BC6146A36AE559C0
+build	v262144	1.4.0	main=25EC346A5EF1374D
+build	v393216	2.0.0	main=7BD427EF7F9C1E6A
+build	v458752	2.0.2	main=F57DB1FA410FD9DD
+package	v458752
+shader_versions	v458752
+
+# ---- Files ----
+modules	main subsdk0 sdk
+romfs_marker	Data.rsdk
+zip_store	.rsdk:.pak:.pac:.usm:.acb:.awb:.bnk:.metallib
+
+# ---- Graphics ----
+
+# ---- Memory ----
+# Valores base de alocação de heap e reserva de espaço virtual para títulos RSDKv5U / Hedgehog Engine
+mem_reserve	0x100000000
+mem_alias	0x10000000
+mem_stack	0x10000000
+app_pool	0xCD500000
+mem_used	0x4000000
+
+# ---- Shader split ----
+shader_groups	/=shaders
+shader_note	Sonic Origins NVN shaders (main / RomFS UI & RSDKv5U)
