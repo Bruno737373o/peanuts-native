@@ -71,13 +71,14 @@ jobs:
           package	2.0.2
           EOF
 
-      - name: Inspecionar ferramentas de shader e peanuts_build.py
+      - name: Executar dm/gfx/tools/shader_split.py
         run: |
-          echo "=== Todos os scripts Python fora de tests ==="
-          find . -name "*.py" -not -path "*/tests/*" | sort
-
-          echo "=== Ajuda do peanuts_build.py ==="
-          python3 peanuts/scripts/peanuts_build.py --help || true
+          echo "=== Ajuda do shader_split.py ==="
+          python3 dm/gfx/tools/shader_split.py --help || true
+          
+          echo "=== Ajuda do dmsh_facts.py e pso_offline.py ==="
+          python3 dm/gfx/tools/dmsh_facts.py --help || true
+          python3 dm/gfx/tools/pso_offline.py --help || true
 
       - name: Verificar arquivos TSV gerados
         run: |
