@@ -71,17 +71,53 @@ jobs:
           package	2.0.2
           EOF
 
-      - name: Inspecionar perfil existente e rodar shader_split.py
+      - name: Gerar game.tsv completo e ler cabeçalho do shader_split.py
         env:
           DM_GAME: "01009FB016286000"
         run: |
-          echo "=== Conteúdo atual de dm/games/01009FB016286000/ ==="
-          ls -la dm/games/01009FB016286000/
-          cat dm/games/01009FB016286000/game.tsv || true
+          mkdir -p dm/games/01009FB016286000
+          EXEFS_DIR=$(dirname "$(find extracted_rom -name "main" -type f | head -n 1)")
 
-          echo "=== Ajuda do shader_split.py com DM_GAME configurado ==="
-          python3 dm/gfx/tools/shader_split.py --help || true
-          python3 dm/gfx/tools/dmsh_facts.py --help || true
+          # Monta a string de Build IDs completos (32 chars hex) dos módulos presentes no exefs
+          BUILD_MODULES=""
+          PRESENT_MODULES=""
+          for mod in main subsdk0 subsdk1 subsdk2 sdk; do
+            if [ -f "$EXEFS_DIR/$mod" ]; then
+              HASH=$(xxd -p -c 16 -s 64 -l 16 "$EXEFS_DIR/$mod")
+              BUILD_MODULES="$BUILD_MODULES $mod=$HASH"
+              PRESENT_MODULES="$PRESENT_MODULES $mod"
+            fi
+          done
+          BUILD_MODULES=$(echo "$BUILD_MODULES" | xargs)
+          PRESENT_MODULES=$(echo "$PRESENT_MODULES" | xargs)
+
+          cat << EOF > dm/games/01009FB016286000/game.tsv
+          title_id	01009FB016286000
+          program_id	01009FB016286000
+          name	Sonic Origins
+          ipa	SonicOrigins.ipa
+          app_category	public.app-category.action-games
+          pad_layout	full
+          build	v458752	2.0.2	$BUILD_MODULES
+          package	v458752
+          shader_versions	v458752
+          modules	$PRESENT_MODULES
+          romfs_marker	Data.rsdk
+          zip_store	.rsdk:.pak:.pac:.usm:.acb:.awb:.bnk:.metallib
+          mem_reserve	0x100000000
+          mem_alias	0x10000000
+          mem_stack	0x10000000
+          app_pool	0xCD500000
+          mem_used	0x4000000
+          shader_groups	/=shaders
+          shader_note	Sonic Origins NVN shaders (main / RomFS UI & RSDKv5U)
+          EOF
+
+          echo "=== game.tsv gerado ==="
+          cat dm/games/01009FB016286000/game.tsv
+
+          echo "=== Instruções de uso do shader_split.py ==="
+          head -n 95 dm/gfx/tools/shader_split.py
 
       - name: Verificar arquivos TSV gerados
         run: |
