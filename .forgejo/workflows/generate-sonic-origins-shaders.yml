@@ -71,16 +71,16 @@ jobs:
           package	2.0.2
           EOF
 
-      - name: Executar shader_split.py
+      - name: Inspecionar módulos do Peanuts e gerar shaders
         run: |
-          SPLIT_SCRIPT=$(find . -name "shader_split.py" -type f | head -n 1)
-          if [ -z "$SPLIT_SCRIPT" ]; then
-            echo "Erro: shader_split.py não encontrado no repositório."
-            exit 1
-          fi
+          echo "=== Arquivos Python no repositório ==="
+          find peanuts/ -maxdepth 2 -name "*.py" | sort
           
-          python3 "$SPLIT_SCRIPT" --help || true
-          python3 "$SPLIT_SCRIPT" --title 01009FB016286000 --exefs "$EXEFS_DIR"
+          echo "=== Verificando entrypoints e CLI ==="
+          grep -rn "if __name__" peanuts/ || true
+          
+          # Verifica se o pacote peanuts aceita execução direta via python3 -m
+          python3 -m peanuts --help || true
 
       - name: Verificar arquivos TSV gerados
         run: |
