@@ -1,0 +1,94 @@
+name: Generate Sonic Origins Shader Profile
+
+on:
+  workflow_dispatch:
+    inputs:
+      mediafire_url:
+        description: 'Link do exefs.zip no MediaFire'
+        required: true
+        default: 'https://www.mediafire.com/file/dt27hi8h8hfwceg/exefs.zip/file?dkey=1y594zbo4m7&r=1701'
+
+jobs:
+  generate-shaders:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório Peanuts Native
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências (Python e utilitários)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl unzip python3 python3-pip binutils xxd
+
+      - name: Baixar exefs.zip do MediaFire
+        env:
+          MF_URL: ${{ github.event.inputs.mediafire_url }}
+        run: |
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+          HTML=$(curl -sL -A "$UA" -c cookies.txt "$MF_URL")
+          
+          # Tenta extrair o link direto padrão ou codificado em base64/data-scrambled-url
+          DIRECT_URL=$(echo "$HTML" | grep -oE 'https://download[0-9]+\.mediafire\.com/[^"'\'' ]+' | head -n 1)
+          
+          if [ -z "$DIRECT_URL" ]; then
+            SCRAMBLED=$(echo "$HTML" | grep -oE 'data-scrambled-url="[^"]+"' | head -n 1 | cut -d'"' -f2)
+            if [ -n "$SCRAMBLED" ]; then
+              DIRECT_URL=$(echo "$SCRAMBLED" | base64 -d 2>/dev/null || true)
+            fi
+          fi
+
+          if [ -z "$DIRECT_URL" ]; then
+            echo "Erro: Não foi possível resolver o link direto do MediaFire."
+            exit 1
+          fi
+
+          echo "Baixando de: $DIRECT_URL"
+          curl -L -A "$UA" -b cookies.txt "$DIRECT_URL" -o exefs.zip
+          
+          # Verifica se o arquivo baixado é realmente um ZIP válido
+          file exefs.zip
+          mkdir -p extracted_rom
+          unzip -q exefs.zip -d extracted_rom/
+          find extracted_rom/ -maxdepth 3
+
+      - name: Identificar Build IDs e preparar game.tsv
+        run: |
+          mkdir -p dm/games/01009FB016286000
+          
+          # Localiza a pasta que contém o arquivo 'main'
+          EXEFS_DIR=$(dirname "$(find extracted_rom -name "main" -type f | head -n 1)")
+          echo "EXEFS_DIR=$EXEFS_DIR" >> $GITHUB_ENV
+          
+          # Extrai o Build ID do main (bytes 0x40..0x47 do cabeçalho NSO0)
+          MAIN_BUILD_ID=$(xxd -p -s 64 -l 8 "$EXEFS_DIR/main" | tr '[:lower:]' '[:upper:]')
+          echo "Build ID detectado no main: $MAIN_BUILD_ID"
+          
+          cat << EOF > dm/games/01009FB016286000/game.tsv
+          title	01009FB016286000
+          name	Sonic Origins
+          build	2.0.2	main=$MAIN_BUILD_ID
+          package	2.0.2
+          EOF
+
+      - name: Inspecionar módulos do Peanuts e gerar shaders
+        run: |
+          echo "=== Arquivos Python no repositório ==="
+          find peanuts/ -maxdepth 2 -name "*.py" | sort
+          
+          echo "=== Verificando entrypoints e CLI ==="
+          grep -rn "if __name__" peanuts/ || true
+          
+          # Verifica se o pacote peanuts aceita execução direta via python3 -m
+          python3 -m peanuts --help || true
+
+      - name: Verificar arquivos TSV gerados
+        run: |
+          ls -la dm/games/01009FB016286000/
+
+      - name: Publicar Artifact com o perfil de shaders
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonic-origins-01009FB016286000-shaders
+          path: dm/games/01009FB016286000/*
+
