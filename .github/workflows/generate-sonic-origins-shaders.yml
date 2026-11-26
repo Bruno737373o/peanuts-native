@@ -19,7 +19,7 @@ jobs:
       - name: Instalar dependências (Python e utilitários)
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl unzip python3 python3-pip binutils xxd
+          sudo apt-get install -y curl unzip python3 python3-pip binutils xxd file
 
       - name: Baixar exefs.zip do MediaFire
         env:
@@ -27,10 +27,9 @@ jobs:
         run: |
           UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
           HTML=$(curl -sL -A "$UA" -c cookies.txt "$MF_URL")
-          
-          # Tenta extrair o link direto padrão ou codificado em base64/data-scrambled-url
+
           DIRECT_URL=$(echo "$HTML" | grep -oE 'https://download[0-9]+\.mediafire\.com/[^"'\'' ]+' | head -n 1)
-          
+
           if [ -z "$DIRECT_URL" ]; then
             SCRAMBLED=$(echo "$HTML" | grep -oE 'data-scrambled-url="[^"]+"' | head -n 1 | cut -d'"' -f2)
             if [ -n "$SCRAMBLED" ]; then
@@ -45,40 +44,20 @@ jobs:
 
           echo "Baixando de: $DIRECT_URL"
           curl -L -A "$UA" -b cookies.txt "$DIRECT_URL" -o exefs.zip
-          
-          # Verifica se o arquivo baixado é realmente um ZIP válido
+
           file exefs.zip
           mkdir -p extracted_rom
           unzip -q exefs.zip -d extracted_rom/
           find extracted_rom/ -maxdepth 3
 
-      - name: Identificar Build IDs e preparar game.tsv
-        run: |
-          mkdir -p dm/games/01009FB016286000
-          
-          # Localiza a pasta que contém o arquivo 'main'
-          EXEFS_DIR=$(dirname "$(find extracted_rom -name "main" -type f | head -n 1)")
-          echo "EXEFS_DIR=$EXEFS_DIR" >> $GITHUB_ENV
-          
-          # Extrai o Build ID do main (bytes 0x40..0x47 do cabeçalho NSO0)
-          MAIN_BUILD_ID=$(xxd -p -s 64 -l 8 "$EXEFS_DIR/main" | tr '[:lower:]' '[:upper:]')
-          echo "Build ID detectado no main: $MAIN_BUILD_ID"
-          
-          cat << EOF > dm/games/01009FB016286000/game.tsv
-          title	01009FB016286000
-          name	Sonic Origins
-          build	2.0.2	main=$MAIN_BUILD_ID
-          package	2.0.2
-          EOF
-
-      - name: Gerar game.tsv completo e ler cabeçalho do shader_split.py
+      - name: Gerar game.tsv completo
         env:
           DM_GAME: "01009FB016286000"
         run: |
           mkdir -p dm/games/01009FB016286000
           EXEFS_DIR=$(dirname "$(find extracted_rom -name "main" -type f | head -n 1)")
+          echo "EXEFS_DIR=$EXEFS_DIR" >> $GITHUB_ENV
 
-          # Monta a string de Build IDs completos (32 chars hex) dos módulos presentes no exefs
           BUILD_MODULES=""
           PRESENT_MODULES=""
           for mod in main subsdk0 subsdk1 subsdk2 sdk; do
@@ -116,16 +95,25 @@ jobs:
           echo "=== game.tsv gerado ==="
           cat dm/games/01009FB016286000/game.tsv
 
-          echo "=== Instruções de uso do shader_split.py ==="
-          head -n 95 dm/gfx/tools/shader_split.py
-
-      - name: Verificar arquivos TSV gerados
+      - name: Ler argumentos do shader_split.py e gerar arquivos TSV
+        env:
+          DM_GAME: "01009FB016286000"
         run: |
+          echo "=== Final do shader_split.py (CLI / sys.argv) ==="
+          tail -n 60 dm/gfx/tools/shader_split.py
+
+          mkdir -p work_shaders
+          DUMP_ROOT=$(dirname "$EXEFS_DIR")
+          python3 dm/gfx/tools/shader_split.py "$DUMP_ROOT" work_shaders || true
+
+          echo "=== Arquivos gerados em dm/games/01009FB016286000/ e work_shaders/ ==="
           ls -la dm/games/01009FB016286000/
+          ls -la work_shaders/
 
       - name: Publicar Artifact com o perfil de shaders
         uses: actions/upload-artifact@v4
         with:
           name: sonic-origins-01009FB016286000-shaders
-          path: dm/games/01009FB016286000/*
-
+          path: |
+            dm/games/01009FB016286000/*
+            work_shaders/*
